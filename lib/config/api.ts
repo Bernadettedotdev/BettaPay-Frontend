@@ -37,6 +37,7 @@ export async function warnIfApiUnreachable(timeoutMs = 3000): Promise<void> {
       signal: controller.signal,
       cache: "no-store",
     });
+
     if (!response.ok) {
       console.warn(
         `[API Client] Backend health check failed (HTTP ${response.status}). ` +
@@ -45,10 +46,9 @@ export async function warnIfApiUnreachable(timeoutMs = 3000): Promise<void> {
     }
   } catch {
     console.warn(
-      `[API Client] Backend unreachable at ${origin}.\n` +
-        `Check that the backend is running and NEXT_PUBLIC_API_URL points to it.\n` +
-        `[Mock Mode] Development and preview flows may fall back to mock data. ` +
-        `Authenticated API operations require a reachable backend.`,
+      `[API] Configured API origin ${origin} is not reachable. ` +
+        `The app is running in mock/offline mode until NEXT_PUBLIC_API_URL points to the live backend. ` +
+        `Check that the backend is running and that NEXT_PUBLIC_API_URL points to it.`,
     );
   } finally {
     clearTimeout(timer);

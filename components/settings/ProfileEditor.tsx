@@ -51,8 +51,6 @@ export function ProfileEditor({
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // Read the active locale for Intl.DisplayNames outside the Controller render
-  // prop — hooks may only be called at the top level of the component.
   const { i18n } = useAppTranslation();
 
   const {
@@ -64,9 +62,9 @@ export function ProfileEditor({
     reset,
     formState: { errors, isDirty, isValid, isSubmitting: isFormSubmitting },
   } = useForm<MerchantProfileFormValues>({
-    resolver: zodResolver(merchantProfileSchema),
     mode: 'onBlur',
     reValidateMode: 'onChange',
+    resolver: zodResolver(merchantProfileSchema),
     defaultValues: {
       businessName: '',
       businessType: 'individual',
@@ -97,12 +95,10 @@ export function ProfileEditor({
     }
   }, [initialData, reset]);
 
-  // Warn the user if they try to leave via browser back/close with unsaved changes.
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (isDirty) {
         e.preventDefault();
-        // Modern browsers ignore the custom message but still show the prompt.
         e.returnValue = '';
       }
     };
@@ -134,14 +130,11 @@ export function ProfileEditor({
     }
   }, [setValue]);
 
-
-
   const onFormSubmit = useCallback(
     async (data: MerchantProfileFormValues) => {
       setSubmitError(null);
       try {
         await onSubmit(data);
-        // Reset dirty state only after a successful save.
         reset(data);
       } catch (error) {
         setSubmitError(error instanceof Error ? error.message : 'Failed to update profile — please try again');
@@ -196,7 +189,6 @@ export function ProfileEditor({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit(onFormSubmit)} noValidate className="space-y-6">
-          {/* Logo Upload */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
               Business Logo
@@ -247,10 +239,7 @@ export function ProfileEditor({
                     Remove
                   </Button>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  PNG, JPG, SVG or WebP. Max 2MB.
-                </p>
-                {/* TODO: Integrate with cloud storage for production uploads */}
+                <p className="text-xs text-muted-foreground">PNG, JPG, SVG or WebP. Max 2MB.</p>
               </div>
             </div>
             {errors.logoUrl && (
@@ -260,9 +249,7 @@ export function ProfileEditor({
             )}
           </div>
 
-          {/* Form Fields Grid */}
           <div className="grid gap-4 sm:grid-cols-2">
-            {/* Business Name */}
             <div className="space-y-1.5">
               <Label htmlFor="profile-businessName" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Business Name <span className="text-destructive">*</span>
@@ -283,7 +270,6 @@ export function ProfileEditor({
               )}
             </div>
 
-            {/* Business Type */}
             <div className="space-y-1.5">
               <Label htmlFor="profile-businessType" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Business Type <span className="text-destructive">*</span>
@@ -324,36 +310,23 @@ export function ProfileEditor({
               )}
             </div>
 
-            {/* Country */}
             <div className="space-y-1.5">
               <Label htmlFor="profile-country" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Country <span className="text-destructive">*</span>
               </Label>
-              {/* Localize country names using Intl.DisplayNames based on active locale */}
               <Controller
                 name="country"
                 control={control}
                 render={({ field }) => {
                   const locale = i18n.language ?? 'en';
-                  // Minimal curated list of ISO 3166-1 alpha-2 country codes used in the app.
                   const COUNTRY_CODES = [
-                    'NG', // Nigeria
-                    'GH', // Ghana
-                    'KE', // Kenya
-                    'ZA', // South Africa
-                    'US', // United States
-                    'GB', // United Kingdom
-                    'CA', // Canada
-                    'FR', // France
-                    'PT', // Portugal
-                    'SE', // Sweden
+                    'NG', 'GH', 'KE', 'ZA', 'US', 'GB', 'CA', 'FR', 'PT', 'SE'
                   ];
 
                   let displayName: Intl.DisplayNames | null = null;
                   try {
                     displayName = new Intl.DisplayNames([locale], { type: 'region' });
                   } catch {
-                    // Fallback to English if locale unsupported
                     displayName = new Intl.DisplayNames(['en'], { type: 'region' });
                   }
 
@@ -391,7 +364,6 @@ export function ProfileEditor({
               )}
             </div>
 
-            {/* Industry */}
             <div className="space-y-1.5">
               <Label htmlFor="profile-industry" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Industry <span className="text-destructive">*</span>
@@ -412,7 +384,6 @@ export function ProfileEditor({
               )}
             </div>
 
-            {/* Website URL */}
             <div className="space-y-1.5">
               <Label htmlFor="profile-websiteUrl" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Website URL
@@ -434,7 +405,6 @@ export function ProfileEditor({
               )}
             </div>
 
-            {/* Contact Email */}
             <div className="space-y-1.5">
               <Label htmlFor="profile-contactEmail" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Contact Email <span className="text-destructive">*</span>
@@ -456,7 +426,6 @@ export function ProfileEditor({
               )}
             </div>
 
-            {/* Phone Number */}
             <div className="space-y-1.5">
               <Label htmlFor="profile-phoneNumber" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Phone Number
@@ -483,7 +452,6 @@ export function ProfileEditor({
             <p role="alert" className="text-sm text-destructive">{submitError}</p>
           )}
 
-          {/* Submit only valid, modified data. */}
           <Button
             type="submit"
             disabled={!isDirty || !isValid || isSaving}

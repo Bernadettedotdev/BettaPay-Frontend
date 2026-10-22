@@ -112,8 +112,9 @@ export function resolveApiBaseUrl(): string {
   if (!hasWarnedAboutBaseUrl && process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     hasWarnedAboutBaseUrl = true;
     console.warn(
-      '[API Client] NEXT_PUBLIC_API_URL is not set. Defaulting to http://localhost:3001. ' +
-      'This will cause API calls to fail in production. Please set NEXT_PUBLIC_API_URL environment variable.'
+      '[API Client] NEXT_PUBLIC_API_URL is not set. Falling back to http://localhost:3001. ' +
+      'This usually indicates a mock/offline development setup and will fail against the live backend. ' +
+      'Set NEXT_PUBLIC_API_URL to the running API before deployment.'
     );
   }
 

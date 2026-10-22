@@ -81,26 +81,34 @@ export default function SettingsPage() {
   const [feeRate, setFeeRate] = useState('0.5');
   const [minThreshold, setMinThreshold] = useState('10');
   const [isSavingFees, setIsSavingFees] = useState(false);
+  const [feeValidationError, setFeeValidationError] = useState<string | null>(null);
   const savingFeesRef = useRef(false);
+
   const feeErrors = useMemo(() => {
     const errors: { feeRate?: string; minThreshold?: string } = {};
     const rate = Number(feeRate);
     const threshold = Number(minThreshold);
+
     if (!feeRate.trim() || !Number.isFinite(rate) || rate < 0) {
       errors.feeRate = 'Enter a valid fee rate of zero or more';
     } else if (feeType === 'percentage' && rate > 100) {
       errors.feeRate = 'Percentage fees cannot exceed 100%';
     }
+
     if (!minThreshold.trim() || !Number.isFinite(threshold) || threshold < 0) {
       errors.minThreshold = 'Enter a valid threshold of zero or more';
     }
+
     return errors;
   }, [feeType, feeRate, minThreshold]);
 
   const handleSaveFees = useCallback(async () => {
     if (!user?.id || !settlementConfigUnlocked || savingFeesRef.current || Object.keys(feeErrors).length > 0) return;
+
     savingFeesRef.current = true;
     setIsSavingFees(true);
+    setFeeValidationError(null);
+
     try {
       await apiClient.patch(`/api/merchants/${encodeURIComponent(user.id)}/fees`, {
         feeType,
@@ -110,12 +118,20 @@ export default function SettingsPage() {
       notify.success('Fee rules updated');
       tabDirtyRef.current = false;
     } catch (error: unknown) {
-      notify.error(getErrorMessage(error));
+      const apiMessage =
+        (error as { response?: { data?: { error?: string; message?: string } } })
+          ?.response?.data?.error ??
+        (error as { response?: { data?: { error?: string; message?: string } } })
+          ?.response?.data?.message ??
+        getErrorMessage(error);
+
+      setFeeValidationError(apiMessage);
+      notify.error(apiMessage);
     } finally {
       savingFeesRef.current = false;
       setIsSavingFees(false);
     }
-  }, [user?.id, settlementConfigUnlocked, feeErrors, feeType, feeRate, minThreshold, notify]);
+  }, [feeErrors, feeRate, feeType, minThreshold, notify, settlementConfigUnlocked, user?.id]);
 
   // Webhook Config State
   const [webhookUrl, setWebhookUrl] = useState('https://example.com/webhooks/bettapay');
@@ -442,7 +458,7 @@ export default function SettingsPage() {
                       aria-describedby={feeErrors.feeRate ? "fee-rate-error" : undefined}
                       max={feeType === 'percentage' ? 100 : undefined}
                       value={feeRate}
-                      onChange={(e) => { setFeeRate(e.target.value); tabDirtyRef.current = true; }}
+                      onChange={(e) => { setFeeRate(e.target.value); setFeeValidationError(null); tabDirtyRef.current = true; }}
                       className="h-10 border-border rounded-xl"
                     />
                     {feeErrors.feeRate && (
@@ -460,7 +476,7 @@ export default function SettingsPage() {
                       aria-invalid={!!feeErrors.minThreshold}
                       aria-describedby={feeErrors.minThreshold ? "fee-threshold-error" : undefined}
                       value={minThreshold}
-                      onChange={(e) => { setMinThreshold(e.target.value); tabDirtyRef.current = true; }}
+                      onChange={(e) => { setMinThreshold(e.target.value); setFeeValidationError(null); tabDirtyRef.current = true; }}
                       className="h-10 border-border rounded-xl"
                     />
                     {feeErrors.minThreshold && (
@@ -468,6 +484,10 @@ export default function SettingsPage() {
                     )}
                   </div>
                 </div>
+
+                {feeValidationError && (
+                  <p className="text-xs text-destructive">{feeValidationError}</p>
+                )}
 
                 <Button
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6"
