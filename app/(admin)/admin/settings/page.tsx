@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, Button } from '@/components/u
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Sliders, Bell, Shield, Gauge } from 'lucide-react';
 import { useNotify } from '@/lib/hooks/useNotify';
+import { ThresholdEditor } from '@/components/admin/alerts/ThresholdEditor';
 
 const POLL_RATES = [
   { label: '1 second (Aggressive)', value: 1000 },
@@ -127,6 +128,8 @@ export default function AdminSettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        <ThresholdEditor />
       </div>
     </div>
   );
