@@ -13,6 +13,9 @@ import {
   RefreshCcw,
   ShieldAlert,
   Settings,
+  Webhook,
+  Coins,
+  BellRing,
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
@@ -36,6 +39,9 @@ const navItems: NavItem[] = [
   { href: "/anchors", label: "Anchors", icon: Anchor },
   { href: "/fx-management", label: "FX Management", icon: RefreshCcw },
   { href: "/compliance", label: "Compliance", icon: ShieldAlert },
+  { href: "/webhooks", label: "Webhooks", icon: Webhook },
+  { href: "/assets", label: "Assets", icon: Coins },
+  { href: "/alerts", label: "Alerts", icon: BellRing },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
