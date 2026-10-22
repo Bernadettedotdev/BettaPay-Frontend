@@ -32,15 +32,23 @@ export async function warnIfApiUnreachable(timeoutMs = 3000): Promise<void> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    await fetch(`${origin}/health`, {
+    const response = await fetch(`${origin}/health`, {
       method: "GET",
       signal: controller.signal,
       cache: "no-store",
     });
+
+    if (!response.ok) {
+      console.warn(
+        `[API Client] Backend health check failed (HTTP ${response.status}). ` +
+          `Check NEXT_PUBLIC_API_URL and the backend /health endpoint.`,
+      );
+    }
   } catch {
     console.warn(
       `[API] Configured API origin ${origin} is not reachable. ` +
-        `The app is running in mock/offline mode until NEXT_PUBLIC_API_URL points to the live backend.`,
+        `The app is running in mock/offline mode until NEXT_PUBLIC_API_URL points to the live backend. ` +
+        `Check that the backend is running and that NEXT_PUBLIC_API_URL points to it.`,
     );
   } finally {
     clearTimeout(timer);

@@ -4,7 +4,7 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 });
 
 // Validate required environment variables at build time.
-if (!process.env.NEXT_PUBLIC_API_URL) {
+if (!process.env.NEXT_PUBLIC_API_URL?.trim() && process.env.NODE_ENV === "production") {
   console.warn(
     "\n⚠️  [Build Warning] NEXT_PUBLIC_API_URL is not set.\n" +
       "The app will default to http://localhost:3001, which is a mock/local fallback and will fail against the live backend.\n" +

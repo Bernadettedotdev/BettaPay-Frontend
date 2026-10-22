@@ -7,6 +7,8 @@ import { useAuthStore } from "@/lib/store/authStore";
 import { useWalletStore } from "@/lib/store/walletStore";
 import { useSessionCheck } from "@/lib/hooks/useSessionCheck";
 import { useCrossTabAuth } from "@/lib/hooks/useCrossTabAuth";
+import { useRateLimitCountdown } from "@/lib/hooks/useRateLimitCountdown";
+import { warnIfApiUnreachable } from "@/lib/config/api";
 import { useCrossTabRateLimit } from "@/lib/hooks/useCrossTabRateLimit";
 import { useSyncOnlineStatus } from "@/lib/hooks/useSyncOnlineStatus";
 import { setAppRouter } from "@/lib/navigation/appRouter";
@@ -125,6 +127,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
   const isProtectedRoute = Boolean(pathname && !isPublicRoute(pathname) && !isAuthRoute(pathname));
   const showFlashGuard = isVerifying && !isAuthenticated && isLoggedIn && isProtectedRoute;
   useCrossTabRateLimit();
+  useRateLimitCountdown();
+
+  useEffect(() => {
+    void warnIfApiUnreachable();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
