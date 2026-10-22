@@ -17,7 +17,7 @@ import { accountNumberSchema } from "@/lib/utils/onboardingSchemas";
 const rows = (data: OnboardingData) => [
   {
     key: "business",
-    label: "Business",
+    label: "Business info",
     value: `${data.businessName} · ${data.businessType} · ${data.country}`,
     step: 0,
   },
@@ -39,6 +39,12 @@ const rows = (data: OnboardingData) => [
     label: "Webhook",
     value: data.webhookUrl || "Not configured",
     step: 3,
+  },
+  {
+    key: "verification",
+    label: "Verification",
+    value: "Manage your business verification documents",
+    step: 4,
   },
 ] as const;
 
@@ -130,7 +136,7 @@ export function StepReview({
                     </span>
                   )}
                 </div>
-                <dd className="truncate text-sm text-muted-foreground mt-0.5">
+                <dd className="break-words text-sm text-muted-foreground mt-0.5">
                   {value}
                 </dd>
                 {isDrifted && (
@@ -151,6 +157,7 @@ export function StepReview({
                 variant={(isDrifted || isInvalid) ? "secondary" : "ghost"}
                 size="sm"
                 onClick={() => onEdit(step)}
+                aria-label={`Edit ${label.toLowerCase()}`}
                 className={cn(
                   (isDrifted || isInvalid) &&
                     "border-amber-500/30 text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"

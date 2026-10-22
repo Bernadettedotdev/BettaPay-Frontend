@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useForm, useWatch } from 'react-hook-form';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowRight, TrendingDown } from 'lucide-react';
@@ -11,6 +12,9 @@ import {
   PRICING_TIERS,
   DEFAULT_AVG_TRANSACTION,
   DEFAULT_VOLUME,
+  MIN_VOLUME,
+  MAX_VOLUME,
+  DEFAULT_COMPARISON_FEES,
   clampVolume,
   estimateMonthlyCost,
   formatUsd,
@@ -28,12 +32,32 @@ export function VolumeCalculator() {
   const searchParams = useSearchParams();
 
   const initialVolume = clampVolume(Number(searchParams?.get('volume')) || DEFAULT_VOLUME);
-  const [volume, setVolume] = useState(initialVolume);
+  const { register, control, setValue, formState: { errors } } = useForm<{
+    volume: number;
+    competitorPercent: number;
+    competitorFixed: number;
+  }>({
+    mode: 'onChange',
+    defaultValues: {
+      volume: initialVolume,
+      competitorPercent: DEFAULT_COMPARISON_FEES.percentFee,
+      competitorFixed: DEFAULT_COMPARISON_FEES.fixedFee,
+    },
+  });
+  const rawVolume = useWatch({ control, name: 'volume' });
+  const competitorPercent = useWatch({ control, name: 'competitorPercent' });
+  const competitorFixed = useWatch({ control, name: 'competitorFixed' });
+  const volumeValid = Number.isFinite(rawVolume) && rawVolume >= MIN_VOLUME && rawVolume <= MAX_VOLUME;
+  const volume = volumeValid ? rawVolume : initialVolume;
+  const comparisonValid = Number.isFinite(competitorPercent) && competitorPercent >= 0 && competitorPercent <= 100
+    && Number.isFinite(competitorFixed) && competitorFixed >= 0;
+  const setVolume = (value: number) => setValue('volume', value, { shouldValidate: true, shouldDirty: true });
   const [avgTransaction, setAvgTransaction] = useState(DEFAULT_AVG_TRANSACTION);
 
   // Persist volume in the URL (?volume=50000), debounced to avoid history spam
   const urlTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
+    if (!volumeValid) return;
     urlTimer.current = setTimeout(() => {
       const params = new URLSearchParams(searchParams?.toString());
       params.set('volume', String(volume));
@@ -41,9 +65,17 @@ export function VolumeCalculator() {
     }, 400);
     return () => clearTimeout(urlTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [volume]);
+  }, [volume, volumeValid]);
 
   const recommended = recommendTier(volume);
+  const selectedTier = PRICING_TIERS.find((tier) => tier.id === recommended)!;
+  const totalFees = volumeValid ? estimateMonthlyCost(selectedTier, volume, avgTransaction) : null;
+  const competitorFees = comparisonValid && volumeValid
+    ? volume * competitorPercent / 100 + volume / avgTransaction * competitorFixed
+    : null;
+  const money = (amount: number) => new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }).format(amount);
   const costs = useMemo(
     () =>
       PRICING_TIERS.map((tier) => ({
@@ -119,9 +151,31 @@ export function VolumeCalculator() {
             Estimated monthly volume
           </p>
           <p className="mt-2 text-4xl font-bold tracking-tight text-foreground" aria-live="polite">
-            {formatUsdCompact(volume)}
+            {volumeValid ? formatUsdCompact(volume) : 'Enter volume'}
             <span className="text-base font-medium text-muted-foreground"> / month</span>
           </p>
+
+          <div className="mt-6 space-y-2">
+            <Label htmlFor="monthly-volume">Monthly volume (USD)</Label>
+            <input
+              id="monthly-volume"
+              type="number"
+              min={MIN_VOLUME}
+              max={MAX_VOLUME}
+              step="1"
+              {...register('volume', {
+                valueAsNumber: true,
+                required: 'Enter a monthly volume.',
+                min: { value: MIN_VOLUME, message: `Enter at least ${formatUsd(MIN_VOLUME)}.` },
+                max: { value: MAX_VOLUME, message: `Enter no more than ${formatUsd(MAX_VOLUME)}.` },
+                validate: (value) => Number.isFinite(value) || 'Enter a valid volume.',
+              })}
+              aria-invalid={Boolean(errors.volume)}
+              aria-describedby={errors.volume ? 'volume-error' : undefined}
+              className="w-full rounded-lg border bg-background p-3"
+            />
+            {errors.volume && <p id="volume-error" role="alert" className="text-sm text-destructive">{errors.volume.message}</p>}
+          </div>
 
           <div className="relative mt-6">
             <input
@@ -165,9 +219,9 @@ export function VolumeCalculator() {
           </div>
 
           <div className="mt-8">
-            <Label htmlFor="avg-transaction" className="text-sm font-medium text-foreground">
+            <p id="avg-transaction" className="text-sm font-medium text-foreground">
               Average transaction size
-            </Label>
+            </p>
             <div className="mt-3 flex flex-wrap gap-2" role="group" aria-labelledby="avg-transaction">
               {AVG_TRANSACTION_OPTIONS.map((size) => (
                 <button
@@ -187,13 +241,49 @@ export function VolumeCalculator() {
               ))}
             </div>
             <p className="mt-3 text-xs text-muted-foreground">
-              ≈ {Math.round(volume / avgTransaction).toLocaleString()} transactions per month
+              {volumeValid ? `≈ ${Math.round(volume / avgTransaction).toLocaleString()} transactions per month` : 'Enter a valid volume to estimate transaction count.'}
             </p>
           </div>
         </div>
 
         {/* Per-tier cost */}
         <div className="space-y-3">
+          <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3" aria-live="polite">
+            <p className="font-semibold">Your estimate — {selectedTier.name}</p>
+            {!volumeValid ? <p>Enter a valid monthly volume to calculate fees.</p> : (
+              <dl className="grid grid-cols-2 gap-2 text-sm">
+                <dt>Input volume</dt><dd className="text-right">{money(volume)}</dd>
+                <dt>Tier fee</dt><dd className="text-right">{selectedTier.transactionFee}</dd>
+                <dt>Total fees</dt><dd className="text-right">{totalFees == null ? 'Custom quote' : money(totalFees)}</dd>
+                <dt>Net amount</dt><dd className="text-right">{totalFees == null ? 'Custom quote' : money(volume - totalFees)}</dd>
+                <dt>Savings vs competitor</dt><dd className="text-right">{totalFees == null ? 'Custom quote' : competitorFees == null ? 'Enter competitor fees' : money(competitorFees - totalFees)}</dd>
+              </dl>
+            )}
+            <p className="text-xs text-muted-foreground">Included volume and per-transaction charges follow the selected tier. Negative savings mean higher fees.</p>
+          </div>
+          <fieldset className="rounded-xl border p-4 space-y-3">
+            <legend className="px-1 text-sm font-medium">Competitor comparison</legend>
+            <p className="text-xs text-muted-foreground">Illustrative rates. Enter your provider’s fees for a personalized comparison.</p>
+            <label className="block text-sm">
+              Percentage fee (%)
+              <input
+                type="number" min="0" max="100" step="0.01"
+                {...register('competitorPercent', { valueAsNumber: true, required: true, min: 0, max: 100 })}
+                aria-invalid={Boolean(errors.competitorPercent)}
+                className="mt-1 w-full rounded-lg border bg-background p-2"
+              />
+            </label>
+            <label className="block text-sm">
+              Fee per transaction (USD)
+              <input
+                type="number" min="0" step="0.01"
+                {...register('competitorFixed', { valueAsNumber: true, required: true, min: 0 })}
+                aria-invalid={Boolean(errors.competitorFixed)}
+                className="mt-1 w-full rounded-lg border bg-background p-2"
+              />
+            </label>
+            {!comparisonValid && <p role="alert" className="text-sm text-destructive">Enter a percentage from 0 to 100 and a non-negative transaction fee.</p>}
+          </fieldset>
           {costs.map(({ tier, cost }) => {
             const isRecommended = tier.id === recommended;
             const explanation = discountExplanations[tier.id];
@@ -217,12 +307,12 @@ export function VolumeCalculator() {
                   <p className="text-xs text-muted-foreground mt-0.5">{tier.transactionFee} per transaction</p>
                 </div>
                 <div className="text-right">
-                  {cost != null ? (
+                  {cost != null && volumeValid ? (
                     <p className="text-lg font-bold text-foreground">{formatUsd(cost)}</p>
                   ) : (
-                    <p className="text-sm font-semibold text-muted-foreground">Contact sales</p>
+                    <p className="text-sm font-semibold text-muted-foreground">{volumeValid ? 'Contact sales' : 'Enter volume'}</p>
                   )}
-                  {explanation && (
+                  {volumeValid && explanation && (
                     <p className={cn(
                       "text-xs mt-0.5 flex items-center justify-end gap-1",
                       explanation.startsWith('Save') || explanation.includes('active') || explanation.includes('apply')

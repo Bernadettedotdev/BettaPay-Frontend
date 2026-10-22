@@ -260,6 +260,8 @@ export const COMPARISON_ROWS: ComparisonRow[] = COMPARISON_FEATURE_LABELS.map((l
 export const MIN_VOLUME = 1_000;
 export const MAX_VOLUME = 10_000_000;
 export const DEFAULT_VOLUME = 50_000;
+// Editable comparison baseline, not a quote from a specific provider.
+export const DEFAULT_COMPARISON_FEES = { percentFee: 2.9, fixedFee: 0.30 } as const;
 export const DEFAULT_AVG_TRANSACTION = 50;
 
 /**

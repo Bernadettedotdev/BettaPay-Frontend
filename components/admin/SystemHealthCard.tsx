@@ -194,6 +194,7 @@ export function SystemHealthCard() {
 
   // Determine overall section status for ARIA live region
   const hasUnhealthy = data?.services.some((s) => s.status === "unhealthy");
+  const hasDegraded = data?.services.some((s) => s.status === "degraded");
 
   return (
     <Card className="col-span-3 bg-card border shadow-sm">
@@ -241,8 +242,14 @@ export function SystemHealthCard() {
         >
           {loading
             ? "Loading system health data"
+            : error
+            ? "System health refresh failed; current status is unknown"
+            : !data
+            ? "System health is unavailable"
             : hasUnhealthy
             ? "One or more services are unhealthy"
+            : hasDegraded
+            ? "One or more services are degraded"
             : "All services are operational"}
         </div>
 
