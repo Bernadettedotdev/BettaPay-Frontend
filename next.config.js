@@ -4,7 +4,7 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 });
 
 // Validate required environment variables at build time
-if (!process.env.NEXT_PUBLIC_API_URL && process.env.NODE_ENV === "production") {
+if (!process.env.NEXT_PUBLIC_API_URL?.trim() && process.env.NODE_ENV === "production") {
   console.warn(
     "\n⚠️  [Build Warning] NEXT_PUBLIC_API_URL is not set.\n" +
       "Production builds will default to http://localhost:3001, causing all API calls to fail.\n" +

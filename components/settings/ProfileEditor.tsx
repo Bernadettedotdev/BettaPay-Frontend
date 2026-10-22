@@ -49,6 +49,7 @@ export function ProfileEditor({
   isSubmitting = false,
 }: ProfileEditorProps) {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Read the active locale for Intl.DisplayNames outside the Controller render
   // prop — hooks may only be called at the top level of the component.
@@ -58,11 +59,14 @@ export function ProfileEditor({
     register,
     handleSubmit,
     setValue,
+    trigger,
     control,
     reset,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, isValid, isSubmitting: isFormSubmitting },
   } = useForm<MerchantProfileFormValues>({
     resolver: zodResolver(merchantProfileSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       businessName: '',
       businessType: 'individual',
@@ -75,7 +79,7 @@ export function ProfileEditor({
     },
   });
 
-
+  const isSaving = isSubmitting || isFormSubmitting;
 
   useEffect(() => {
     if (initialData) {
@@ -134,9 +138,14 @@ export function ProfileEditor({
 
   const onFormSubmit = useCallback(
     async (data: MerchantProfileFormValues) => {
-      await onSubmit(data);
-      // Reset dirty state after a successful save so the guard clears.
-      reset(data);
+      setSubmitError(null);
+      try {
+        await onSubmit(data);
+        // Reset dirty state only after a successful save.
+        reset(data);
+      } catch (error) {
+        setSubmitError(error instanceof Error ? error.message : 'Failed to update profile — please try again');
+      }
     },
     [onSubmit, reset]
   );
@@ -179,14 +188,14 @@ export function ProfileEditor({
           <Building2 className="w-4 h-4 text-primary" />
           Business Profile
           {isDirty && (
-            <span className="ml-2 text-xs font-normal text-warning bg-warning/10 border border-warning/20 px-2 py-0.5 rounded-full">
+            <span role="status" className="ml-2 text-xs font-normal text-warning bg-warning/10 border border-warning/20 px-2 py-0.5 rounded-full">
               Unsaved changes
             </span>
           )}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
+        <form onSubmit={handleSubmit(onFormSubmit)} noValidate className="space-y-6">
           {/* Logo Upload */}
           <div className="space-y-1.5">
             <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -219,7 +228,7 @@ export function ProfileEditor({
                   variant="outline"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={isSubmitting}
+                  disabled={isSaving}
                   className="rounded-xl"
                 >
                   <Upload className="w-3.5 h-3.5 mr-1.5" />
@@ -231,7 +240,7 @@ export function ProfileEditor({
                     variant="ghost"
                     size="sm"
                     onClick={handleRemoveLogo}
-                    disabled={isSubmitting}
+                    disabled={isSaving}
                     className="rounded-xl text-destructive hover:text-destructive hover:bg-destructive/10"
                   >
                     <X className="w-3.5 h-3.5 mr-1.5" />
@@ -245,7 +254,7 @@ export function ProfileEditor({
               </div>
             </div>
             {errors.logoUrl && (
-              <p className="text-xs text-destructive mt-1">
+              <p id="profile-logoUrl-error" role="alert" className="text-xs text-destructive mt-1">
                 {errors.logoUrl.message}
               </p>
             )}
@@ -255,18 +264,20 @@ export function ProfileEditor({
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Business Name */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Label htmlFor="profile-businessName" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Business Name <span className="text-destructive">*</span>
               </Label>
               <Input
-                {...register('businessName')}
+                {...register('businessName', { onBlur: () => { void trigger('businessName'); } })}
+                id="profile-businessName"
+                aria-describedby={errors.businessName ? 'profile-businessName-error' : undefined}
                 aria-invalid={!!errors.businessName}
                 placeholder="Enter business name"
                 className="h-10 border-border rounded-xl bg-card text-sm"
-                disabled={isSubmitting}
+                disabled={isSaving}
               />
               {errors.businessName && (
-                <p className="text-xs text-destructive mt-1">
+                <p id="profile-businessName-error" role="alert" className="text-xs text-destructive mt-1">
                   {errors.businessName.message}
                 </p>
               )}
@@ -274,7 +285,7 @@ export function ProfileEditor({
 
             {/* Business Type */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Label htmlFor="profile-businessType" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Business Type <span className="text-destructive">*</span>
               </Label>
               <Controller
@@ -283,10 +294,17 @@ export function ProfileEditor({
                 render={({ field }) => (
                   <Select
                     value={field.value}
-                    onValueChange={field.onChange}
-                    disabled={isSubmitting}
+                    onValueChange={(value) => { field.onChange(value); void trigger('businessType'); }}
+                    disabled={isSaving}
                   >
-                    <SelectTrigger className="w-full h-10 border-border rounded-xl bg-card text-sm">
+                    <SelectTrigger
+                      id="profile-businessType"
+                      aria-invalid={!!errors.businessType}
+                      ref={field.ref}
+                      onBlur={() => { field.onBlur(); void trigger('businessType'); }}
+                      aria-describedby={errors.businessType ? 'profile-businessType-error' : undefined}
+                      className="w-full h-10 border-border rounded-xl bg-card text-sm"
+                    >
                       <SelectValue placeholder="Select business type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -300,7 +318,7 @@ export function ProfileEditor({
                 )}
               />
               {errors.businessType && (
-                <p className="text-xs text-destructive mt-1">
+                <p id="profile-businessType-error" role="alert" className="text-xs text-destructive mt-1">
                   {errors.businessType.message}
                 </p>
               )}
@@ -308,7 +326,7 @@ export function ProfileEditor({
 
             {/* Country */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Label htmlFor="profile-country" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Country <span className="text-destructive">*</span>
               </Label>
               {/* Localize country names using Intl.DisplayNames based on active locale */}
@@ -342,10 +360,17 @@ export function ProfileEditor({
                   return (
                     <Select
                       value={field.value || null}
-                      onValueChange={(val) => field.onChange(val ?? '')}
-                      disabled={isSubmitting}
+                      onValueChange={(val) => { field.onChange(val ?? ''); void trigger('country'); }}
+                      disabled={isSaving}
                     >
-                      <SelectTrigger className="w-full h-10 border-border rounded-xl bg-card text-sm" aria-invalid={!!errors.country}>
+                      <SelectTrigger
+                        id="profile-country"
+                        ref={field.ref}
+                        onBlur={() => { field.onBlur(); void trigger('country'); }}
+                        aria-describedby={errors.country ? 'profile-country-error' : undefined}
+                        className="w-full h-10 border-border rounded-xl bg-card text-sm"
+                        aria-invalid={!!errors.country}
+                      >
                         <SelectValue placeholder="Select your country" />
                       </SelectTrigger>
                       <SelectContent>
@@ -360,7 +385,7 @@ export function ProfileEditor({
                 }}
               />
               {errors.country && (
-                <p className="text-xs text-destructive mt-1">
+                <p id="profile-country-error" role="alert" className="text-xs text-destructive mt-1">
                   {errors.country.message}
                 </p>
               )}
@@ -368,18 +393,20 @@ export function ProfileEditor({
 
             {/* Industry */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Label htmlFor="profile-industry" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Industry <span className="text-destructive">*</span>
               </Label>
               <Input
-                {...register('industry')}
+                {...register('industry', { onBlur: () => { void trigger('industry'); } })}
+                id="profile-industry"
+                aria-describedby={errors.industry ? 'profile-industry-error' : undefined}
                 aria-invalid={!!errors.industry}
                 placeholder="e.g. Fintech, E-commerce"
                 className="h-10 border-border rounded-xl bg-card text-sm"
-                disabled={isSubmitting}
+                disabled={isSaving}
               />
               {errors.industry && (
-                <p className="text-xs text-destructive mt-1">
+                <p id="profile-industry-error" role="alert" className="text-xs text-destructive mt-1">
                   {errors.industry.message}
                 </p>
               )}
@@ -387,19 +414,21 @@ export function ProfileEditor({
 
             {/* Website URL */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Label htmlFor="profile-websiteUrl" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Website URL
               </Label>
               <Input
-                {...register('websiteUrl')}
+                {...register('websiteUrl', { onBlur: () => { void trigger('websiteUrl'); } })}
+                id="profile-websiteUrl"
+                aria-describedby={errors.websiteUrl ? 'profile-websiteUrl-error' : undefined}
                 type="url"
                 aria-invalid={!!errors.websiteUrl}
                 placeholder="https://example.com"
                 className="h-10 border-border rounded-xl bg-card text-sm"
-                disabled={isSubmitting}
+                disabled={isSaving}
               />
               {errors.websiteUrl && (
-                <p className="text-xs text-destructive mt-1">
+                <p id="profile-websiteUrl-error" role="alert" className="text-xs text-destructive mt-1">
                   {errors.websiteUrl.message}
                 </p>
               )}
@@ -407,19 +436,21 @@ export function ProfileEditor({
 
             {/* Contact Email */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Label htmlFor="profile-contactEmail" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Contact Email <span className="text-destructive">*</span>
               </Label>
               <Input
-                {...register('contactEmail')}
+                {...register('contactEmail', { onBlur: () => { void trigger('contactEmail'); } })}
+                id="profile-contactEmail"
+                aria-describedby={errors.contactEmail ? 'profile-contactEmail-error' : undefined}
                 type="email"
                 aria-invalid={!!errors.contactEmail}
                 placeholder="contact@example.com"
                 className="h-10 border-border rounded-xl bg-card text-sm"
-                disabled={isSubmitting}
+                disabled={isSaving}
               />
               {errors.contactEmail && (
-                <p className="text-xs text-destructive mt-1">
+                <p id="profile-contactEmail-error" role="alert" className="text-xs text-destructive mt-1">
                   {errors.contactEmail.message}
                 </p>
               )}
@@ -427,32 +458,38 @@ export function ProfileEditor({
 
             {/* Phone Number */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <Label htmlFor="profile-phoneNumber" className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Phone Number
               </Label>
               <Input
-                {...register('phoneNumber')}
+                {...register('phoneNumber', { onBlur: () => { void trigger('phoneNumber'); } })}
+                id="profile-phoneNumber"
+                aria-describedby={errors.phoneNumber ? 'profile-phoneNumber-error' : undefined}
                 type="tel"
                 aria-invalid={!!errors.phoneNumber}
                 placeholder="+234 800 000 0000"
                 className="h-10 border-border rounded-xl bg-card text-sm"
-                disabled={isSubmitting}
+                disabled={isSaving}
               />
               {errors.phoneNumber && (
-                <p className="text-xs text-destructive mt-1">
+                <p id="profile-phoneNumber-error" role="alert" className="text-xs text-destructive mt-1">
                   {errors.phoneNumber.message}
                 </p>
               )}
             </div>
           </div>
 
-          {/* Submit — disabled until the form has unsaved changes */}
+          {submitError && (
+            <p role="alert" className="text-sm text-destructive">{submitError}</p>
+          )}
+
+          {/* Submit only valid, modified data. */}
           <Button
             type="submit"
-            disabled={!isDirty || isSubmitting}
+            disabled={!isDirty || !isValid || isSaving}
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6 text-sm disabled:opacity-50"
           >
-            {isSubmitting ? (
+            {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Saving...

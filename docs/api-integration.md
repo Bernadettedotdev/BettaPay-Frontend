@@ -8,7 +8,6 @@ The shared Axios client lives in [`lib/api/axios.ts`](../lib/api/axios.ts):
 
 ```ts
 export const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
@@ -16,13 +15,31 @@ export const apiClient = axios.create({
 
 Key behavior:
 
-- `NEXT_PUBLIC_API_URL` controls the backend base URL.
-- If the variable is unset, the frontend defaults to `http://localhost:3001`.
+- The request interceptor resolves the backend base URL for each request: explicit override (`setApiBaseUrl`), runtime `window.__BETTAPAY_API_URL__`, `NEXT_PUBLIC_API_URL`, then the default.
+- If the variable is unset or blank, the frontend defaults to `http://localhost:3001`. Production builds warn about missing configuration; development requests warn once in the browser console.
+- The shared app provider checks `/health` once on startup. Network failures log an `[API Client]` diagnostic and a `[Mock Mode]` notice explaining that development/preview flows may use mock data. A non-successful health response is reported separately. This diagnostic does not enable mock mode or turn failed writes into successful saves.
 - `withCredentials: true` is enabled so browser requests include backend-set cookies.
 - JSON is the default request/response format.
 - State-changing requests (`POST`, `PUT`, `PATCH`, `DELETE`) attach the CSRF header from the CSRF cookie when available.
 - A separate refresh client posts to `/api/auth/refresh` after a `401` response, then retries the original request.
 - A `429` response updates the rate-limit store and shows an accessible toast/announcement.
+
+## Merchant fee rules
+
+The settings editor saves fee rules through `PATCH /api/merchants/:id/fees`
+using the authenticated merchant's ID and the shared API client:
+
+```json
+{
+  "feeType": "percentage",
+  "feeRate": 0.5,
+  "minThreshold": 10
+}
+```
+
+`feeType` is `percentage` or `flat`. The rate and threshold are finite,
+non-negative numbers; percentage rates cannot exceed 100. The editor blocks
+concurrent saves and retains unsaved changes if the request fails.
 
 ## Authentication model
 
