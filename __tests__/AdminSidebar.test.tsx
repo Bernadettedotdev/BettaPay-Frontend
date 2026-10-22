@@ -59,6 +59,9 @@ jest.mock("lucide-react", () => {
     RefreshCcw: icon("RefreshCcw"),
     ShieldAlert: icon("ShieldAlert"),
     Settings: icon("Settings"),
+    Webhook: icon("Webhook"),
+    Coins: icon("Coins"),
+    BellRing: icon("BellRing"),
     ShieldCheck: icon("ShieldCheck"),
     ChevronLeft: icon("ChevronLeft"),
     ChevronRight: icon("ChevronRight"),
@@ -111,6 +114,9 @@ const ADMIN_NAV = [
   { label: "Anchors", href: "/anchors" },
   { label: "FX Management", href: "/fx-management" },
   { label: "Compliance", href: "/compliance" },
+  { label: "Webhooks", href: "/webhooks" },
+  { label: "Assets", href: "/assets" },
+  { label: "Alerts", href: "/alerts" },
   { label: "Settings", href: "/admin/settings" },
 ] as const;
 
@@ -141,7 +147,7 @@ describe("AdminSidebar — rendering", () => {
     });
   });
 
-  it("renders the correct number of nav items (7)", () => {
+  it("renders the correct number of nav items (10)", () => {
     renderAdmin();
     // The logo link is also a <Link>, so we scope to the <nav> element
     const nav = screen.getByRole("navigation", { name: /admin menu/i });

@@ -21,6 +21,9 @@ const ADMIN_EXACT = new Set<string>([
   "/anchors",
   "/fx-management",
   "/compliance",
+  "/webhooks",
+  "/assets",
+  "/alerts",
 ]);
 const ADMIN_PREFIXES = ["/admin", "/merchants/kyb"];
 
