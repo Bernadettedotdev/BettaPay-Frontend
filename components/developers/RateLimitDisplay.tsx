@@ -20,7 +20,13 @@ function formatCountdown(seconds: number) {
 }
 
 export function RateLimitDisplay() {
-  const { rateLimitedUntil, secondsRemaining, endpoint, limit: storeLimit, tick } = useRateLimitStore();
+  // Subscribe to the shared 429 window so updates from the API interceptor and
+  // other tabs are reflected immediately in this display.
+  const rateLimitedUntil = useRateLimitStore((state) => state.rateLimitedUntil);
+  const secondsRemaining = useRateLimitStore((state) => state.secondsRemaining);
+  const endpoint = useRateLimitStore((state) => state.endpoint);
+  const storeLimit = useRateLimitStore((state) => state.limit);
+  const tick = useRateLimitStore((state) => state.tick);
 
   const [status, setStatus] = useState<RateLimitStatus | null>(null);
   const [secondsUntilReset, setSecondsUntilReset] = useState(0);
@@ -104,7 +110,7 @@ export function RateLimitDisplay() {
               </div>
               <div>
                 <span className="text-muted-foreground block font-medium">Rate Limit Policy:</span>
-                <span className="font-semibold text-xs">{storeLimit ? `${storeLimit} max requests / window` : status ? `${status.limit} max requests / window` : "Standard Policy"}</span>
+                <span className="font-semibold text-xs">{storeLimit ?? status?.limit ? `${storeLimit ?? status?.limit} max requests / window` : "Policy unavailable"}</span>
               </div>
             </div>
           </div>
