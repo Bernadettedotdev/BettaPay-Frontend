@@ -101,9 +101,13 @@ export async function checkSoroban(): Promise<ServiceHealth> {
         }),
         signal: AbortSignal.timeout(5_000),
         cache: "no-store",
-      }).then((r) => {
+      }).then(async (r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.json();
+        const body = await r.json();
+        if (body.error || body.result?.status !== "healthy") {
+          throw new Error("Soroban RPC reported an unhealthy service");
+        }
+        return body;
       })
     );
 

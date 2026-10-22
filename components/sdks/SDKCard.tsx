@@ -7,24 +7,16 @@ import {
   Card,
   CardHeader,
   CardTitle,
-  CardDescription,
   CardContent,
   CardAction,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui";
 import { Button, buttonVariants } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { SDK_TYPE_LABELS, type SDKDefinition } from "@/lib/sdks";
 
-interface SDKCardProps {
-  name: string;
-  language: string;
-  version: string;
-  installCommand: string;
-  githubUrl: string;
-  docsUrl: string;
-  status: "published" | "coming-soon";
-  description: string;
-  icon: React.ReactNode;
+interface SDKCardProps extends SDKDefinition {
+  icon?: React.ReactNode;
 }
 
 export default function SDKCard({
@@ -37,14 +29,19 @@ export default function SDKCard({
   status,
   description,
   icon,
+  types,
 }: SDKCardProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(installCommand);
-    setCopied(true);
-    toast.success("Copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(installCommand);
+      setCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Unable to copy. Select and copy the command manually.");
+    }
   };
 
   return (
@@ -68,7 +65,12 @@ export default function SDKCard({
                 {status === "published" ? "Published" : "Coming Soon"}
               </Badge>
             </CardTitle>
-            <CardDescription>{language}</CardDescription>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <Badge variant="outline">{language}</Badge>
+              {types.map((type) => (
+                <Badge key={type} variant="secondary">{SDK_TYPE_LABELS[type]}</Badge>
+              ))}
+            </div>
           </div>
         </div>
         <CardAction>
@@ -84,7 +86,7 @@ export default function SDKCard({
         </p>
 
         <div className="flex items-center gap-2 rounded-lg border bg-muted/50 p-3">
-          <code className="flex-1 text-xs font-mono text-foreground truncate">
+          <code className="min-w-0 flex-1 break-all text-xs font-mono text-foreground">
             {installCommand}
           </code>
           <Button

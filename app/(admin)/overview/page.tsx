@@ -1,6 +1,7 @@
 "use client";
 
 import { memo } from 'react';
+import { SystemHealthCard } from '@/components/admin/SystemHealthCard';
 import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle, Skeleton } from '@/components/ui';
 import { CurrencyDisplay, ErrorDisplay, StatCard, ErrorBoundary } from '@/components/shared';
@@ -131,58 +132,7 @@ export default function AdminOverviewPage() {
       <div className="grid gap-4 md:grid-cols-7">
         <AdminChartSection />
 
-        <Card className="col-span-3 bg-card border shadow-sm">
-          <CardHeader>
-            <CardTitle>System Health</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-success"></div>
-                  <div>
-                    <p className="text-sm font-medium">Stellar Horizon API</p>
-                    <p className="text-xs text-muted-foreground">Operational</p>
-                  </div>
-                </div>
-                <span className="text-xs font-mono text-muted-foreground">14ms ping</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-success"></div>
-                  <div>
-                    <p className="text-sm font-medium">Soroban RPC</p>
-                    <p className="text-xs text-muted-foreground">Operational</p>
-                  </div>
-                </div>
-                <span className="text-xs font-mono text-muted-foreground">42ms ping</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-success"></div>
-                  <div>
-                    <p className="text-sm font-medium">SEP-24 Anchor (NGN)</p>
-                    <p className="text-xs text-muted-foreground">Operational</p>
-                  </div>
-                </div>
-                <span className="text-xs font-mono text-muted-foreground">Syncing</span>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                  <div>
-                    <p className="text-sm font-medium">PostgreSQL Database</p>
-                    <p className="text-xs text-muted-foreground">High Load</p>
-                  </div>
-                </div>
-                <span className="text-xs font-mono text-warning">82% CPU</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <SystemHealthCard />
       </div>
     </div>
   );
