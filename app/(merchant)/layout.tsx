@@ -15,7 +15,6 @@ import { useWalletStore } from "@/lib/store/walletStore";
 import { useAuthStore } from "@/lib/store/authStore";
 import { ROUTES } from "@/lib/navigation/routes";
 import { useSessionTimeout } from "@/lib/hooks/useSessionTimeout";
-import { useRateLimitCountdown } from "@/lib/hooks/useRateLimitCountdown";
 import { SessionTimeoutModal } from "@/components/SessionTimeoutModal";
 import { CommandPalette } from "@/components/command/CommandPalette";
 
@@ -43,8 +42,6 @@ export default function MerchantLayout({
   const { showWarning, secondsRemaining, isExtending, extendSession } = useSessionTimeout({
     onTimeout: handleTimeoutLogout,
   });
-
-  useRateLimitCountdown();
 
   const handleExtend = useCallback(async () => {
     const success = await extendSession();

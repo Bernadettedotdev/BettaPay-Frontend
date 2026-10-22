@@ -132,15 +132,14 @@ export default function DevelopersPage() {
         type: newKeyType,
       });
 
-      const resData = response?.data || {};
+      const resData = response?.data?.data || response?.data || {};
+      const rawSecret =
+        resData.key || resData.rawKey || resData.apiKey || resData.secretKey;
+      if (typeof rawSecret !== "string" || !rawSecret.trim()) {
+        throw new Error("The API created the key but did not return its one-time secret. Please contact support before retrying.");
+      }
       const prefix =
         resData.prefix || (newKeyType === "live" ? "bp_live_" : "bp_test_");
-      const rawSecret =
-        resData.key ||
-        resData.rawKey ||
-        resData.apiKey ||
-        resData.secretKey ||
-        `${prefix}${Math.random().toString(36).substring(2, 18)}`;
       const suffix = resData.suffix || `...${rawSecret.slice(-4)}`;
 
       const createdKey = {

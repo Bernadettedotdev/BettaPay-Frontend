@@ -6,7 +6,7 @@ import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Toggle } from '@/components/ui';
-import { Settings, User, Bell, Shield, LogOut, Key, Globe, Percent, Plus, Trash2, RefreshCcw, Eye, EyeOff, ShieldCheck, Lock } from 'lucide-react';
+import { Settings, User, Bell, Shield, LogOut, Key, Globe, Percent, Plus, Trash2, RefreshCcw, Eye, EyeOff, ShieldCheck, Lock, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui';
 import { useAuthStore } from '@/lib/store/authStore';
 import { KybDocumentsPanel } from '@/components/kyc/KybDocumentsPanel';
@@ -18,6 +18,7 @@ import { ROUTES } from '@/lib/navigation/routes';
 import { ProfileEditor } from '@/components/settings/ProfileEditor';
 import { useMerchantProfile } from '@/lib/api/hooks';
 import { apiClient } from '@/lib/api/axios';
+import { getErrorMessage } from '@/lib/utils/apiError';
 import type { MerchantProfileFormValues } from '@/lib/utils/validation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui';
@@ -38,6 +39,21 @@ const notificationOptions = [
   { id: 'failedTransactions', label: 'Failed transactions', desc: 'Alert on failed or reversed payments' },
   { id: 'fxRateChanges', label: 'FX rate changes', desc: 'Notify on significant rate movements (±5%)' },
 ];
+
+function webhookUrlError(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const isDevelopmentLocalhost =
+      process.env.NODE_ENV === 'development' &&
+      (url.hostname === 'localhost' || url.hostname === '127.0.0.1');
+    if (url.protocol !== 'https:' && !(isDevelopmentLocalhost && url.protocol === 'http:')) {
+      return 'Webhook URL must use HTTPS (HTTP is allowed for localhost in development).';
+    }
+    return null;
+  } catch {
+    return 'Enter a valid webhook URL.';
+  }
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -79,9 +95,63 @@ export default function SettingsPage() {
   const [feeType, setFeeType] = useState<'percentage' | 'flat'>('percentage');
   const [feeRate, setFeeRate] = useState('0.5');
   const [minThreshold, setMinThreshold] = useState('10');
+  const [isSavingFees, setIsSavingFees] = useState(false);
+  const [feeValidationError, setFeeValidationError] = useState<string | null>(null);
+  const savingFeesRef = useRef(false);
+
+  const feeErrors = useMemo(() => {
+    const errors: { feeRate?: string; minThreshold?: string } = {};
+    const rate = Number(feeRate);
+    const threshold = Number(minThreshold);
+
+    if (!feeRate.trim() || !Number.isFinite(rate) || rate < 0) {
+      errors.feeRate = 'Enter a valid fee rate of zero or more';
+    } else if (feeType === 'percentage' && rate > 100) {
+      errors.feeRate = 'Percentage fees cannot exceed 100%';
+    }
+
+    if (!minThreshold.trim() || !Number.isFinite(threshold) || threshold < 0) {
+      errors.minThreshold = 'Enter a valid threshold of zero or more';
+    }
+
+    return errors;
+  }, [feeType, feeRate, minThreshold]);
+
+  const handleSaveFees = useCallback(async () => {
+    if (!user?.id || !settlementConfigUnlocked || savingFeesRef.current || Object.keys(feeErrors).length > 0) return;
+
+    savingFeesRef.current = true;
+    setIsSavingFees(true);
+    setFeeValidationError(null);
+
+    try {
+      await apiClient.patch(`/api/merchants/${encodeURIComponent(user.id)}/fees`, {
+        feeType,
+        feeRate: Number(feeRate),
+        minThreshold: Number(minThreshold),
+      });
+      notify.success('Fee rules updated');
+      tabDirtyRef.current = false;
+    } catch (error: unknown) {
+      const apiMessage =
+        (error as { response?: { data?: { error?: string; message?: string } } })
+          ?.response?.data?.error ??
+        (error as { response?: { data?: { error?: string; message?: string } } })
+          ?.response?.data?.message ??
+        getErrorMessage(error);
+
+      setFeeValidationError(apiMessage);
+      notify.error(apiMessage);
+    } finally {
+      savingFeesRef.current = false;
+      setIsSavingFees(false);
+    }
+  }, [feeErrors, feeRate, feeType, minThreshold, notify, settlementConfigUnlocked, user?.id]);
 
   // Webhook Config State
   const [webhookUrl, setWebhookUrl] = useState('https://example.com/webhooks/bettapay');
+  const [isTestingWebhook, setIsTestingWebhook] = useState(false);
+  const webhookUrlValidationError = webhookUrlError(webhookUrl);
   const [webhookSecret, setWebhookSecret] = useState('whsec_live_9876543210abcdef');
   const [showSecret, setShowSecret] = useState(false);
   // API Keys State
@@ -223,6 +293,7 @@ export default function SettingsPage() {
   const handleTabChange = useCallback((id: string) => {
     // Guard against switching tabs when fee/webhook state is dirty.
     // ProfileEditor handles its own dirty guard internally.
+    if (savingFeesRef.current) return;
     if (tabDirtyRef.current) {
       const confirmed = window.confirm(
         'You have unsaved changes. Leave this tab and discard them?'
@@ -234,7 +305,7 @@ export default function SettingsPage() {
   }, []);
 
   const handleProfileSubmit = useCallback(async (data: MerchantProfileFormValues) => {
-    if (!user?.id) return;
+    if (!user?.id) throw new Error('Sign in to update your profile');
     setIsSubmitting(true);
     try {
       await apiClient.patch(`/api/merchants/${user.id}`, data);
@@ -246,7 +317,9 @@ export default function SettingsPage() {
           ?.response?.data?.error ??
         (err as { response?: { data?: { error?: string; message?: string } } })
           ?.response?.data?.message;
-      notify.error(apiMessage ?? 'Failed to update profile — please try again');
+      const message = apiMessage ?? getErrorMessage(err);
+      notify.error(message);
+      throw new Error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -258,8 +331,25 @@ export default function SettingsPage() {
     notify.success('Webhook signing secret rotated');
   };
 
-  const handleTestWebhook = () => {
-    notify.info(`Sent ping event to ${webhookUrl}`);
+  const handleTestWebhook = async () => {
+    if (webhookUrlValidationError) {
+      notify.error(webhookUrlValidationError);
+      return;
+    }
+    setIsTestingWebhook(true);
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'ping', created_at: new Date().toISOString() }),
+      });
+      if (!response.ok) throw new Error(`Endpoint returned HTTP ${response.status}`);
+      notify.success(`Webhook endpoint responded with HTTP ${response.status}`);
+    } catch (err: unknown) {
+      notify.error(err instanceof Error ? `Webhook ping failed: ${err.message}` : 'Webhook ping failed');
+    } finally {
+      setIsTestingWebhook(false);
+    }
   };
 
   const handleCreateApiKey = () => {
@@ -377,9 +467,9 @@ export default function SettingsPage() {
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="space-y-2">
-                  <Label className="text-xs font-semibold text-foreground">Fee Deduction Model</Label>
-                  <Select value={feeType} onValueChange={(val) => { setFeeType(val as 'percentage' | 'flat'); tabDirtyRef.current = true; }}>
-                    <SelectTrigger className="h-10 border-border rounded-xl">
+                  <Label htmlFor="fee-type" className="text-xs font-semibold text-foreground">Fee Deduction Model</Label>
+                  <Select value={feeType} disabled={isSavingFees} onValueChange={(val) => { if (val === 'percentage' || val === 'flat') { setFeeType(val); tabDirtyRef.current = true; } }}>
+                    <SelectTrigger id="fee-type" className="h-10 border-border rounded-xl">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -391,43 +481,56 @@ export default function SettingsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-foreground">Fee Rate ({feeType === 'percentage' ? '%' : 'USDC'})</Label>
+                    <Label htmlFor="fee-rate" className="text-xs font-semibold text-foreground">Fee Rate ({feeType === 'percentage' ? '%' : 'USDC'})</Label>
                     <Input
                       type="number"
+                      id="fee-rate"
+                      min="0"
+                      step="any"
+                      disabled={isSavingFees}
+                      aria-invalid={!!feeErrors.feeRate}
+                      aria-describedby={feeErrors.feeRate ? "fee-rate-error" : undefined}
+                      max={feeType === 'percentage' ? 100 : undefined}
                       value={feeRate}
-                      onChange={(e) => { setFeeRate(e.target.value); tabDirtyRef.current = true; }}
+                      onChange={(e) => { setFeeRate(e.target.value); setFeeValidationError(null); tabDirtyRef.current = true; }}
                       className="h-10 border-border rounded-xl"
                     />
+                    {feeErrors.feeRate && (
+                      <p id="fee-rate-error" role="alert" className="text-xs text-destructive">{feeErrors.feeRate}</p>
+                    )}
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-xs font-semibold text-foreground">Min Settlement Threshold (USDC)</Label>
+                    <Label htmlFor="fee-threshold" className="text-xs font-semibold text-foreground">Min Settlement Threshold (USDC)</Label>
                     <Input
                       type="number"
+                      id="fee-threshold"
+                      min="0"
+                      step="any"
+                      disabled={isSavingFees}
+                      aria-invalid={!!feeErrors.minThreshold}
+                      aria-describedby={feeErrors.minThreshold ? "fee-threshold-error" : undefined}
                       value={minThreshold}
-                      onChange={(e) => { setMinThreshold(e.target.value); tabDirtyRef.current = true; }}
+                      onChange={(e) => { setMinThreshold(e.target.value); setFeeValidationError(null); tabDirtyRef.current = true; }}
                       className="h-10 border-border rounded-xl"
                     />
+                    {feeErrors.minThreshold && (
+                      <p id="fee-threshold-error" role="alert" className="text-xs text-destructive">{feeErrors.minThreshold}</p>
+                    )}
                   </div>
                 </div>
 
+                {feeValidationError && (
+                  <p className="text-xs text-destructive">{feeValidationError}</p>
+                )}
+
                 <Button
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6"
-                  onClick={async () => {
-                    try {
-                      await apiClient.patch('/api/merchants/fee-rules', { feeType, feeRate, minThreshold });
-                      notify.success('Fee rules updated');
-                      tabDirtyRef.current = false;
-                    } catch (err: unknown) {
-                      const apiMessage =
-                        (err as { response?: { data?: { error?: string; message?: string } } })
-                          ?.response?.data?.error ??
-                        (err as { response?: { data?: { error?: string; message?: string } } })
-                          ?.response?.data?.message;
-                      notify.error(apiMessage ?? 'Failed to save fee rules — please try again');
-                    }
-                  }}
+                  onClick={handleSaveFees}
+                  disabled={isSavingFees || !user?.id || Object.keys(feeErrors).length > 0}
+                  aria-busy={isSavingFees}
                 >
-                  Save Fee Rules
+                  {isSavingFees && <Loader2 className="w-4 h-4 mr-2 animate-spin" aria-hidden="true" />}
+                  {isSavingFees ? 'Saving...' : 'Save Fee Rules'}
                 </Button>
               </CardContent>
             </Card>
@@ -446,7 +549,14 @@ export default function SettingsPage() {
                     value={webhookUrl}
                     onChange={(e) => { setWebhookUrl(e.target.value); tabDirtyRef.current = true; }}
                     className="h-10 border-border rounded-xl font-mono text-sm"
+                    aria-invalid={Boolean(webhookUrlValidationError)}
+                    aria-describedby={webhookUrlValidationError ? 'webhook-url-error' : undefined}
                   />
+                  {webhookUrlValidationError && (
+                    <p id="webhook-url-error" className="text-sm text-destructive" role="alert">
+                      {webhookUrlValidationError}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -470,6 +580,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3 pt-2">
                   <Button
                     className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6"
+                    disabled={Boolean(webhookUrlValidationError)}
                     onClick={async () => {
                       try {
                         await apiClient.patch('/api/merchants/webhook', { url: webhookUrl });
@@ -487,8 +598,8 @@ export default function SettingsPage() {
                   >
                     Save Webhook Config
                   </Button>
-                  <Button variant="outline" onClick={handleTestWebhook} className="rounded-xl h-10 px-4 text-xs font-semibold">
-                    Test Ping Webhook
+                  <Button variant="outline" onClick={handleTestWebhook} disabled={Boolean(webhookUrlValidationError) || isTestingWebhook} className="rounded-xl h-10 px-4 text-xs font-semibold">
+                    {isTestingWebhook ? 'Testing…' : 'Test Ping Webhook'}
                   </Button>
                 </div>
               </CardContent>
