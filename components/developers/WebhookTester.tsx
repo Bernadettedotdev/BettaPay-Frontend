@@ -122,7 +122,7 @@ async function computeHmacSignature(secret: string, payloadStr: string): Promise
     const hex = cryptoModule.createHmac("sha256", secret).update(payloadStr).digest("hex");
     return `sha256=${hex}`;
   } catch {
-    return "";
+    throw new Error("Unable to compute webhook signature in this browser");
   }
 }
 
@@ -161,6 +161,16 @@ export function WebhookTester({
   const handleSend = useCallback(async () => {
     if (!endpointUrl.trim()) {
       notify.error("Please enter a valid webhook endpoint URL");
+      return;
+    }
+
+    try {
+      const endpoint = new URL(endpointUrl);
+      if (endpoint.protocol !== "https:" && endpoint.hostname !== "localhost" && endpoint.hostname !== "127.0.0.1") {
+        throw new Error("Webhook endpoints must use HTTPS");
+      }
+    } catch {
+      notify.error("Enter a valid HTTPS webhook endpoint URL");
       return;
     }
 
