@@ -40,7 +40,7 @@ export async function warnIfApiUnreachable(timeoutMs = 3000): Promise<void> {
   } catch {
     console.warn(
       `[API] Configured API origin ${origin} is not reachable. ` +
-        `Set NEXT_PUBLIC_API_URL to the running backend.`,
+        `The app is running in mock/offline mode until NEXT_PUBLIC_API_URL points to the live backend.`,
     );
   } finally {
     clearTimeout(timer);

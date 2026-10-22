@@ -60,8 +60,11 @@ export function ProfileEditor({
     setValue,
     control,
     reset,
-    formState: { errors, isDirty },
+    trigger,
+    formState: { errors, isDirty, isValid },
   } = useForm<MerchantProfileFormValues>({
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     resolver: zodResolver(merchantProfileSchema),
     defaultValues: {
       businessName: '',
@@ -130,7 +133,12 @@ export function ProfileEditor({
     }
   }, [setValue]);
 
-
+  const validateField = useCallback(
+    async (field: keyof MerchantProfileFormValues) => {
+      await trigger(field);
+    },
+    [trigger]
+  );
 
   const onFormSubmit = useCallback(
     async (data: MerchantProfileFormValues) => {
@@ -259,7 +267,9 @@ export function ProfileEditor({
                 Business Name <span className="text-destructive">*</span>
               </Label>
               <Input
-                {...register('businessName')}
+                {...register('businessName', {
+                  onBlur: () => void validateField('businessName'),
+                })}
                 aria-invalid={!!errors.businessName}
                 placeholder="Enter business name"
                 className="h-10 border-border rounded-xl bg-card text-sm"
@@ -283,7 +293,15 @@ export function ProfileEditor({
                 render={({ field }) => (
                   <Select
                     value={field.value}
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      void validateField('businessType');
+                    }}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        void validateField('businessType');
+                      }
+                    }}
                     disabled={isSubmitting}
                   >
                     <SelectTrigger className="w-full h-10 border-border rounded-xl bg-card text-sm">
@@ -342,7 +360,15 @@ export function ProfileEditor({
                   return (
                     <Select
                       value={field.value || null}
-                      onValueChange={(val) => field.onChange(val ?? '')}
+                      onValueChange={(val) => {
+                        field.onChange(val ?? '');
+                        void validateField('country');
+                      }}
+                      onOpenChange={(open) => {
+                        if (!open) {
+                          void validateField('country');
+                        }
+                      }}
                       disabled={isSubmitting}
                     >
                       <SelectTrigger className="w-full h-10 border-border rounded-xl bg-card text-sm" aria-invalid={!!errors.country}>
@@ -372,7 +398,9 @@ export function ProfileEditor({
                 Industry <span className="text-destructive">*</span>
               </Label>
               <Input
-                {...register('industry')}
+                {...register('industry', {
+                  onBlur: () => void validateField('industry'),
+                })}
                 aria-invalid={!!errors.industry}
                 placeholder="e.g. Fintech, E-commerce"
                 className="h-10 border-border rounded-xl bg-card text-sm"
@@ -391,7 +419,9 @@ export function ProfileEditor({
                 Website URL
               </Label>
               <Input
-                {...register('websiteUrl')}
+                {...register('websiteUrl', {
+                  onBlur: () => void validateField('websiteUrl'),
+                })}
                 type="url"
                 aria-invalid={!!errors.websiteUrl}
                 placeholder="https://example.com"
@@ -411,7 +441,9 @@ export function ProfileEditor({
                 Contact Email <span className="text-destructive">*</span>
               </Label>
               <Input
-                {...register('contactEmail')}
+                {...register('contactEmail', {
+                  onBlur: () => void validateField('contactEmail'),
+                })}
                 type="email"
                 aria-invalid={!!errors.contactEmail}
                 placeholder="contact@example.com"
@@ -431,7 +463,9 @@ export function ProfileEditor({
                 Phone Number
               </Label>
               <Input
-                {...register('phoneNumber')}
+                {...register('phoneNumber', {
+                  onBlur: () => void validateField('phoneNumber'),
+                })}
                 type="tel"
                 aria-invalid={!!errors.phoneNumber}
                 placeholder="+234 800 000 0000"
@@ -449,7 +483,7 @@ export function ProfileEditor({
           {/* Submit — disabled until the form has unsaved changes */}
           <Button
             type="submit"
-            disabled={!isDirty || isSubmitting}
+            disabled={!isDirty || !isValid || isSubmitting}
             className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6 text-sm disabled:opacity-50"
           >
             {isSubmitting ? (

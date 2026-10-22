@@ -6,7 +6,7 @@ import { Button } from '@/components/ui';
 import { Input } from '@/components/ui';
 import { Label } from '@/components/ui';
 import { Toggle } from '@/components/ui';
-import { Settings, User, Bell, Shield, LogOut, Key, Globe, Percent, Plus, Trash2, RefreshCcw, Eye, EyeOff, ShieldCheck, Lock } from 'lucide-react';
+import { Settings, User, Bell, Shield, LogOut, Key, Globe, Percent, Plus, Trash2, RefreshCcw, Eye, EyeOff, ShieldCheck, Lock, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui';
 import { useAuthStore } from '@/lib/store/authStore';
 import { KybDocumentsPanel } from '@/components/kyc/KybDocumentsPanel';
@@ -79,6 +79,8 @@ export default function SettingsPage() {
   const [feeType, setFeeType] = useState<'percentage' | 'flat'>('percentage');
   const [feeRate, setFeeRate] = useState('0.5');
   const [minThreshold, setMinThreshold] = useState('10');
+  const [isSavingFees, setIsSavingFees] = useState(false);
+  const [feeValidationError, setFeeValidationError] = useState<string | null>(null);
 
   // Webhook Config State
   const [webhookUrl, setWebhookUrl] = useState('https://example.com/webhooks/bettapay');
@@ -252,6 +254,55 @@ export default function SettingsPage() {
     }
   }, [user?.id, notify, refetchProfile]);
 
+  const handleSaveFeeRules = useCallback(async () => {
+    if (isSavingFees) return;
+    if (!user?.id) {
+      notify.error('Merchant profile is unavailable. Please refresh and try again.');
+      return;
+    }
+
+    const parsedRate = Number(feeRate);
+    const parsedThreshold = Number(minThreshold);
+
+    if (!Number.isFinite(parsedRate) || !Number.isFinite(parsedThreshold)) {
+      setFeeValidationError('Fee rate and settlement threshold must be valid numbers.');
+      return;
+    }
+
+    if (parsedRate < 0 || parsedThreshold < 0) {
+      setFeeValidationError('Fee rate and settlement threshold cannot be negative.');
+      return;
+    }
+
+    if (feeType === 'percentage' && parsedRate > 100) {
+      setFeeValidationError('Percentage fees must be 100% or less.');
+      return;
+    }
+
+    setFeeValidationError(null);
+    setIsSavingFees(true);
+
+    try {
+      await apiClient.patch(`/api/merchants/${user.id}/fees`, {
+        feeType,
+        feeRate: parsedRate,
+        minThreshold: parsedThreshold,
+      });
+      notify.success('Fee rules updated');
+      tabDirtyRef.current = false;
+    } catch (err: unknown) {
+      const apiMessage =
+        (err as { response?: { data?: { error?: string; message?: string } } })
+          ?.response?.data?.error ??
+        (err as { response?: { data?: { error?: string; message?: string } } })
+          ?.response?.data?.message;
+      setFeeValidationError(apiMessage ?? 'Failed to save fee rules — please try again');
+      notify.error(apiMessage ?? 'Failed to save fee rules — please try again');
+    } finally {
+      setIsSavingFees(false);
+    }
+  }, [feeRate, feeType, isSavingFees, minThreshold, notify, user?.id]);
+
   const handleRotateWebhookSecret = () => {
     const nextSecret = `whsec_live_${Math.random().toString(36).substring(2, 18)}`;
     setWebhookSecret(nextSecret);
@@ -395,7 +446,7 @@ export default function SettingsPage() {
                     <Input
                       type="number"
                       value={feeRate}
-                      onChange={(e) => { setFeeRate(e.target.value); tabDirtyRef.current = true; }}
+                      onChange={(e) => { setFeeRate(e.target.value); setFeeValidationError(null); tabDirtyRef.current = true; }}
                       className="h-10 border-border rounded-xl"
                     />
                   </div>
@@ -404,30 +455,29 @@ export default function SettingsPage() {
                     <Input
                       type="number"
                       value={minThreshold}
-                      onChange={(e) => { setMinThreshold(e.target.value); tabDirtyRef.current = true; }}
+                      onChange={(e) => { setMinThreshold(e.target.value); setFeeValidationError(null); tabDirtyRef.current = true; }}
                       className="h-10 border-border rounded-xl"
                     />
                   </div>
                 </div>
 
+                {feeValidationError && (
+                  <p className="text-xs text-destructive">{feeValidationError}</p>
+                )}
+
                 <Button
                   className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl h-10 px-6"
-                  onClick={async () => {
-                    try {
-                      await apiClient.patch('/api/merchants/fee-rules', { feeType, feeRate, minThreshold });
-                      notify.success('Fee rules updated');
-                      tabDirtyRef.current = false;
-                    } catch (err: unknown) {
-                      const apiMessage =
-                        (err as { response?: { data?: { error?: string; message?: string } } })
-                          ?.response?.data?.error ??
-                        (err as { response?: { data?: { error?: string; message?: string } } })
-                          ?.response?.data?.message;
-                      notify.error(apiMessage ?? 'Failed to save fee rules — please try again');
-                    }
-                  }}
+                  onClick={handleSaveFeeRules}
+                  disabled={isSavingFees || !user?.id}
                 >
-                  Save Fee Rules
+                  {isSavingFees ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    'Save Fee Rules'
+                  )}
                 </Button>
               </CardContent>
             </Card>
