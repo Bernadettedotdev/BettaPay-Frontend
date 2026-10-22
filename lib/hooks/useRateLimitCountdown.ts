@@ -3,21 +3,20 @@
 import { useEffect } from 'react';
 import { useRateLimitStore } from '../store/rateLimitStore';
 
-/**
- * Hook that manages the rate limit countdown timer.
- *
- * Creates a single steady interval on mount that recomputes `secondsRemaining`
- * from the stored epoch on every tick. The interval is only torn down on
- * unmount — store changes no longer recreate it, preventing drift.
- */
+/** Keep the shared countdown current while a rate-limit window is active. */
 export function useRateLimitCountdown() {
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const { rateLimitedUntil, tick } = useRateLimitStore.getState();
-      if (rateLimitedUntil === 0) return;
-      tick();
-    }, 1000);
+  const rateLimitedUntil = useRateLimitStore((state) => state.rateLimitedUntil);
+  const tick = useRateLimitStore((state) => state.tick);
 
+  useEffect(() => {
+    if (rateLimitedUntil <= 0) return;
+
+    // Reconcile persisted windows immediately, including ones that expired
+    // while the app was closed. Each tick uses the epoch to avoid timer drift.
+    tick();
+    if (rateLimitedUntil <= Date.now()) return;
+
+    const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [rateLimitedUntil, tick]);
 }

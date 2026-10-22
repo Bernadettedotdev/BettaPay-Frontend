@@ -109,7 +109,7 @@ export function resolveApiBaseUrl(): string {
     return normalizeBaseUrl(configured);
   }
 
-  if (!hasWarnedAboutBaseUrl && typeof window !== 'undefined') {
+  if (!hasWarnedAboutBaseUrl && process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     hasWarnedAboutBaseUrl = true;
     console.warn(
       '[API Client] NEXT_PUBLIC_API_URL is not set. Defaulting to http://localhost:3001. ' +
